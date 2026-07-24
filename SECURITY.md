@@ -22,3 +22,5 @@ This will be updated as we upgrade DeepSeek-Personal.
 ## is DeepSeek Personal free or paid?
 
 Its paid. Only 1 dollar though!
+
+## This is a DeepSeek that is MODIFIED. It is not just something that is just free.
