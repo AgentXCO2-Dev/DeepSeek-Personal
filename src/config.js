@@ -2,40 +2,55 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 /**
- * Reads the password list from environment variables.
- * Supports both old single-password (API_PASSWORD) and new multi-password (API_PASSWORDS) formats.
- * Returns an array of valid passwords – or an empty array if none are set.
+ * Collect Groq API keys from environment variables.
+ * Looks for: GROQ_API_KEY, GROQ_API_KEY1, GROQ_API_KEY2, GROQ_API_KEY3
+ * Only includes keys that are set (non-empty).
+ */
+const getGroqKeys = () => {
+  const keys = [];
+  const envKeys = [
+    process.env.GROQ_API_KEY,
+    process.env.GROQ_API_KEY1,
+    process.env.GROQ_API_KEY2,
+    process.env.GROQ_API_KEY3
+  ];
+  
+  for (const key of envKeys) {
+    if (key && key.trim().length > 0) {
+      keys.push(key.trim());
+    }
+  }
+  return keys;
+};
+
+/**
+ * Parse multiple passwords (comma-separated) – same as before.
  */
 const getPasswords = () => {
-  // 1. If multiple passwords are set (comma-separated) – use those
   if (process.env.API_PASSWORDS) {
-    const passwords = process.env.API_PASSWORDS.split(',')
+    return process.env.API_PASSWORDS.split(',')
       .map(p => p.trim())
       .filter(p => p.length > 0);
-    if (passwords.length > 0) return passwords;
   }
-  // 2. Fallback to single password (backward compatible)
   if (process.env.API_PASSWORD) {
     return [process.env.API_PASSWORD];
   }
-  // 3. NO ULTIMATE FALLBACK – if nothing is set, return empty array
   return [];
 };
 
 export const config = {
-  // Groq API key (FREE – from console.groq.com)
-  groqApiKey: process.env.GROQ_API_KEY,
+  // Groq – up to 4 keys
+  groqApiKeys: getGroqKeys(),
   
-  // Array of valid passwords – all read from environment, never hardcoded
-  // If this array is empty, authentication will reject all requests.
+  // Optional OpenRouter fallback
+  openRouterApiKey: process.env.OPENROUTER_API_KEY || null,
+  
+  // Passwords
   apiPasswords: getPasswords(),
   
-  // ChromaDB persistence directory
-  chromaPersistDir: process.env.CHROMA_PERSIST_DIR || './chroma_db',
-  
-  // How many past memories to retrieve
+  // Memory (simple in‑memory, no ChromaDB)
   maxMemoryResults: 5,
   
-  // Server port (Render injects this automatically)
+  // Server
   port: process.env.PORT || 8000,
 };
