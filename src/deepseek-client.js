@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { config } from './config.js';
+import { moderateUserInput, moderateAIOutput, getSafetySystemPrompt } from './guardrails.js';
 
 // ============================
 // HELPERS
@@ -20,12 +21,44 @@ function getNextGroqKey() {
 }
 
 // ============================
-// MAIN CHAT COMPLETION
+// MAIN CHAT COMPLETION (WITH GUARDRAILS)
 // ============================
 
 export async function chatCompletion(messages, thinking = true, reasoningEffort = 'high') {
-  // Try Groq with multi-key rotation and retry
-  return await callGroqWithRetry(messages);
+  // 1. Check the user's last message (the last user message in the array)
+  const lastUserMsg = messages.filter(m => m.role === 'user').pop();
+  if (lastUserMsg && lastUserMsg.content) {
+    try {
+      moderateUserInput(lastUserMsg.content);
+    } catch (error) {
+      if (error.code === 'SAFETY_VIOLATION') {
+        // Return a safe response instead of calling the AI
+        return "I can't help with that request. Let's keep our conversation respectful and safe. 🙏";
+      }
+      throw error;
+    }
+  }
+
+  // 2. Inject safety system prompt (merge with existing system prompt)
+  const safetyPrompt = getSafetySystemPrompt();
+  let systemMsg = messages.find(m => m.role === 'system');
+  if (systemMsg) {
+    systemMsg.content = safetyPrompt + '\n\n' + systemMsg.content;
+  } else {
+    // If no system prompt, add one
+    messages.unshift({ role: 'system', content: safetyPrompt });
+  }
+
+  // 3. Try Groq with multi-key rotation and retry
+  try {
+    const response = await callGroqWithRetry(messages);
+    // 4. Moderate the AI output
+    const safeResponse = moderateAIOutput(response);
+    return safeResponse;
+  } catch (error) {
+    // If Groq fails, re-throw (no fallback)
+    throw error;
+  }
 }
 
 // ============================
@@ -36,7 +69,6 @@ async function callGroqWithRetry(messages) {
   let lastError = null;
   const maxRetries = 3;
 
-  // Try each key at most maxRetries times (rotate on 429)
   for (let attempt = 0; attempt < config.groqApiKeys.length * maxRetries; attempt++) {
     const apiKey = getNextGroqKey();
     try {
@@ -48,11 +80,9 @@ async function callGroqWithRetry(messages) {
       if (status === 429) {
         console.log(`⏳ Rate limit on key. Waiting ${retryAfter}ms before retry... (attempt ${attempt+1})`);
         await sleep(retryAfter);
-        // Continue loop to try next key
         continue;
       }
       
-      // Non‑rate-limit error – re-throw
       throw error;
     }
   }
