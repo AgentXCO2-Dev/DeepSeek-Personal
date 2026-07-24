@@ -17,8 +17,8 @@ const getPasswords = () => {
 };
 
 export const config = {
-  // Cerebras API (FREE – get from inference.cerebras.ai)
-  cerebrasApiKey: process.env.CEREBRAS_API_KEY,
+  // Mistral API (FREE – 1B tokens/month!)
+  mistralApiKey: process.env.MISTRAL_API_KEY,
   
   // Passwords
   apiPasswords: getPasswords(),
