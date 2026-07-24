@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: twin-ai-node
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: API_PASSWORD
+        sync: false
+      - key: NODE_VERSION
+        value: 20.11.0
