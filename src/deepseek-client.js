@@ -35,33 +35,33 @@ export async function chatCompletion(messages, thinking = true, reasoningEffort 
     messages.unshift({ role: 'system', content: safetyPrompt });
   }
 
-  // 3. Call Cerebras with retry logic
+  // 3. Call Mistral with retry logic
   try {
-    const response = await callCerebrasWithRetry(messages);
+    const response = await callMistralWithRetry(messages);
     // 4. Moderate the AI output
     const safeResponse = moderateAIOutput(response);
     return safeResponse;
   } catch (error) {
-    console.error('Cerebras API error:', error.message);
+    console.error('Mistral API error:', error.message);
     throw error;
   }
 }
 
 // ============================
-// CEREBRAS IMPLEMENTATION (WITH RETRY)
+// MISTRAL IMPLEMENTATION (WITH RETRY)
 // ============================
 
-async function callCerebrasWithRetry(messages, retries = 3) {
+async function callMistralWithRetry(messages, retries = 3) {
   let lastError = null;
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      return await callCerebras(messages);
+      return await callMistral(messages);
     } catch (error) {
       const status = error.response?.status;
       const retryAfter = parseInt(error.response?.headers?.['retry-after'] || '5000');
       
       if (status === 429) {
-        console.log(`⏳ Cerebras rate limited (attempt ${attempt + 1}/${retries}). Waiting ${retryAfter}ms...`);
+        console.log(`⏳ Mistral rate limited (attempt ${attempt + 1}/${retries}). Waiting ${retryAfter}ms...`);
         await sleep(retryAfter);
         continue;
       }
@@ -70,12 +70,12 @@ async function callCerebrasWithRetry(messages, retries = 3) {
       throw error;
     }
   }
-  throw new Error('❌ Cerebras rate limit exceeded. Please try again later.');
+  throw new Error('❌ Mistral rate limit exceeded. Please try again later.');
 }
 
-async function callCerebras(messages) {
-  if (!config.cerebrasApiKey) {
-    throw new Error('❌ CEREBRAS_API_KEY not configured. Please add it to your environment variables.');
+async function callMistral(messages) {
+  if (!config.mistralApiKey) {
+    throw new Error('❌ MISTRAL_API_KEY not configured. Please add it to your environment variables.');
   }
 
   // Extract system prompt (if any)
@@ -88,19 +88,19 @@ async function callCerebras(messages) {
     return true;
   });
 
-  // Format messages for Cerebras (OpenAI‑compatible format)
-  const cerebrasMessages = [];
+  // Format messages for Mistral (OpenAI‑compatible format)
+  const mistralMessages = [];
   if (systemPrompt) {
-    cerebrasMessages.push({ role: 'system', content: systemPrompt });
+    mistralMessages.push({ role: 'system', content: systemPrompt });
   }
   filteredMessages.forEach(msg => {
-    cerebrasMessages.push({ role: msg.role, content: msg.content });
+    mistralMessages.push({ role: msg.role, content: msg.content });
   });
 
-  // Cerebras API payload
+  // Mistral API payload – using the free-tier model
   const payload = {
-    model: 'llama-3.1-70b-instruct',  // ✅ Correct model name
-    messages: cerebrasMessages,
+    model: 'mistral-small-latest',  // ✅ Free tier model – 1B tokens/month!
+    messages: mistralMessages,
     temperature: 0.7,
     max_tokens: 8192,
     top_p: 0.95,
@@ -109,12 +109,12 @@ async function callCerebras(messages) {
 
   try {
     const response = await axios.post(
-      'https://api.cerebras.ai/v1/chat/completions',  // ✅ Correct endpoint
+      'https://api.mistral.ai/v1/chat/completions',  // ✅ Correct endpoint
       payload,
       {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.cerebrasApiKey}`,
+          'Authorization': `Bearer ${config.mistralApiKey}`,
         },
         timeout: 60000,
       }
@@ -122,7 +122,7 @@ async function callCerebras(messages) {
 
     const content = response.data.choices?.[0]?.message?.content;
     if (!content) {
-      throw new Error('Empty response from Cerebras');
+      throw new Error('Empty response from Mistral');
     }
     return content;
   } catch (error) {
@@ -131,41 +131,32 @@ async function callCerebras(messages) {
     const errorMessage = errorData?.error?.message || error.message;
 
     // Detailed error logging
-    console.error('Cerebras API error details:', {
+    console.error('Mistral API error details:', {
       status,
       error: errorData,
       message: errorMessage,
     });
 
     // Handle specific HTTP status codes
-    if (status === 404) {
-      throw new Error(
-        '❌ Cerebras API endpoint not found (404). Please check:\n' +
-        '   - Your API key is valid at inference.cerebras.ai\n' +
-        '   - The endpoint URL is correct (https://api.cerebras.ai/v1/chat/completions)\n' +
-        '   - You have access to the llama-3.1-70b-instruct model'
-      );
-    }
-
     if (status === 401 || status === 403) {
       throw new Error(
-        '❌ Invalid Cerebras API key (401/403). Please verify your key at inference.cerebras.ai'
+        '❌ Invalid Mistral API key (401/403). Please verify your key at console.mistral.ai'
       );
     }
 
     if (status === 429) {
       throw new Error(
-        `❌ Cerebras rate limit exceeded. Retry after ${error.response?.headers?.['retry-after'] || 'a few seconds'}.`
+        `❌ Mistral rate limit exceeded. Retry after ${error.response?.headers?.['retry-after'] || 'a few seconds'}.`
       );
     }
 
-    if (errorMessage.toLowerCase().includes('quota')) {
+    if (errorMessage.toLowerCase().includes('quota') || errorMessage.toLowerCase().includes('credit')) {
       throw new Error(
-        '❌ Cerebras quota exhausted. Please check your usage at inference.cerebras.ai'
+        '❌ Mistral quota exhausted. Your free 1B tokens might be used up. Check your usage at console.mistral.ai'
       );
     }
 
     // Generic fallback
-    throw new Error(`Cerebras API error: ${errorMessage}`);
+    throw new Error(`Mistral API error: ${errorMessage}`);
   }
 }
