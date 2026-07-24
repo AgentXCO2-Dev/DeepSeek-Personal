@@ -24,7 +24,7 @@ const getGroqKeys = () => {
 };
 
 /**
- * Parse multiple passwords (comma-separated) – same as before.
+ * Parse multiple passwords (comma-separated)
  */
 const getPasswords = () => {
   if (process.env.API_PASSWORDS) {
@@ -42,13 +42,10 @@ export const config = {
   // Groq – up to 4 keys
   groqApiKeys: getGroqKeys(),
   
-  // Optional OpenRouter fallback
-  openRouterApiKey: process.env.OPENROUTER_API_KEY || null,
-  
   // Passwords
   apiPasswords: getPasswords(),
   
-  // Memory (simple in‑memory, no ChromaDB)
+  // Memory (simple in‑memory)
   maxMemoryResults: 5,
   
   // Server
