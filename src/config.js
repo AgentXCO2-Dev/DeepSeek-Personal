@@ -2,28 +2,6 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 /**
- * Collect Groq API keys from environment variables.
- * Looks for: GROQ_API_KEY, GROQ_API_KEY1, GROQ_API_KEY2, GROQ_API_KEY3
- * Only includes keys that are set (non-empty).
- */
-const getGroqKeys = () => {
-  const keys = [];
-  const envKeys = [
-    process.env.GROQ_API_KEY,
-    process.env.GROQ_API_KEY1,
-    process.env.GROQ_API_KEY2,
-    process.env.GROQ_API_KEY3
-  ];
-  
-  for (const key of envKeys) {
-    if (key && key.trim().length > 0) {
-      keys.push(key.trim());
-    }
-  }
-  return keys;
-};
-
-/**
  * Parse multiple passwords (comma-separated)
  */
 const getPasswords = () => {
@@ -39,8 +17,8 @@ const getPasswords = () => {
 };
 
 export const config = {
-  // Groq – up to 4 keys
-  groqApiKeys: getGroqKeys(),
+  // Cerebras API (FREE – get from inference.cerebras.ai)
+  cerebrasApiKey: process.env.CEREBRAS_API_KEY,
   
   // Passwords
   apiPasswords: getPasswords(),
