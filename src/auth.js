@@ -5,13 +5,20 @@ import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { config } from './config.js';
 import {
-  findUserByEmail, findUserByGoogleId, createUser, createUserWithGoogle, findUserById,
+  findUserByEmail,
+  findUserByGoogleId,
+  createUser,
+  createUserWithGoogle,
+  findUserById,
   getDb
 } from './db.js';
 
 const router = express.Router();
 
-// ===== JWT Helpers =====
+// ============================
+// JWT Helpers
+// ============================
+
 function generateToken(user) {
   return jwt.sign(
     { id: user.id, email: user.email },
@@ -20,7 +27,10 @@ function generateToken(user) {
   );
 }
 
-// ===== Passport Google Strategy =====
+// ============================
+// Passport Google Strategy
+// ============================
+
 passport.use(new GoogleStrategy({
     clientID: config.googleClientId,
     clientSecret: config.googleClientSecret,
@@ -60,7 +70,10 @@ passport.deserializeUser(async (id, done) => {
   done(null, user);
 });
 
-// ===== PAYWALL VERIFICATION =====
+// ============================
+// PAYWALL VERIFICATION
+// ============================
+
 router.post('/verify-password', (req, res) => {
   const { password } = req.body;
   if (!password) {
@@ -74,7 +87,10 @@ router.post('/verify-password', (req, res) => {
   res.json({ success: true });
 });
 
-// ===== Register =====
+// ============================
+// REGISTER
+// ============================
+
 router.post('/register', async (req, res) => {
   const { email, password, displayName } = req.body;
   if (!email || !password) {
@@ -91,10 +107,20 @@ router.post('/register', async (req, res) => {
   const userId = await createUser(email, hash, displayName || email);
   const user = await findUserById(userId);
   const token = generateToken(user);
-  res.json({ token, user: { id: user.id, email: user.email, displayName: user.display_name } });
+  res.json({
+    token,
+    user: {
+      id: user.id,
+      email: user.email,
+      displayName: user.display_name
+    }
+  });
 });
 
-// ===== Login =====
+// ============================
+// LOGIN
+// ============================
+
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -112,18 +138,29 @@ router.post('/login', async (req, res) => {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
   const token = generateToken(user);
-  const userData = { id: user.id, email: user.email, displayName: user.display_name };
+  const userData = {
+    id: user.id,
+    email: user.email,
+    displayName: user.display_name
+  };
   res.json({ token, user: userData });
 });
 
-// ===== Google OAuth routes =====
+// ============================
+// GOOGLE OAUTH ROUTES
+// ============================
+
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 router.get('/google/callback',
   passport.authenticate('google', { session: false, failureRedirect: '/auth/google/failure' }),
   (req, res) => {
     const token = generateToken(req.user);
-    const user = { id: req.user.id, email: req.user.email, displayName: req.user.display_name };
+    const user = {
+      id: req.user.id,
+      email: req.user.email,
+      displayName: req.user.display_name
+    };
     const frontendUrl = process.env.FRONTEND_URL || 'https://AgentXCO2-Dev.github.io/DeepSeek-Personal';
     res.redirect(`${frontendUrl}?token=${token}&user=${encodeURIComponent(JSON.stringify(user))}`);
   }
@@ -133,7 +170,10 @@ router.get('/google/failure', (req, res) => {
   res.status(401).json({ error: 'Google authentication failed' });
 });
 
-// ===== Get current user (protected) =====
+// ============================
+// GET CURRENT USER (PROTECTED)
+// ============================
+
 router.get('/me', async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -143,8 +183,14 @@ router.get('/me', async (req, res) => {
   try {
     const decoded = jwt.verify(token, config.jwtSecret);
     const user = await findUserById(decoded.id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({ id: user.id, email: user.email, displayName: user.display_name });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({
+      id: user.id,
+      email: user.email,
+      displayName: user.display_name
+    });
   } catch {
     res.status(401).json({ error: 'Invalid token' });
   }
