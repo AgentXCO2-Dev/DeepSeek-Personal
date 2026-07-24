@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DeepSeek Memory – Modified DeepSeek AI with Long‑Term Memory</title>
-  <meta name="description" content="DeepSeek Memory – A modified DeepSeek AI with long‑term memory, built for twin." />
+  <title>DeepSeek Memory – Personalized AI</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -12,10 +11,7 @@
   <div id="password-screen" class="password-screen">
     <div class="password-box">
       <h1>🧠 DeepSeek Memory</h1>
-      <p><em>Modified DeepSeek AI with long‑term memory.</em></p>
-      <p style="font-size: 0.85rem; color: #888; margin-top: -10px; margin-bottom: 16px;">
-        Enter your password to access your personal AI.
-      </p>
+      <p><em>Modified DeepSeek AI with long‑term memory</em></p>
       <input type="password" id="password-input" placeholder="Password..." />
       <button id="password-btn">Unlock</button>
       <div id="password-error" class="error-message"></div>
@@ -28,14 +24,10 @@
     <aside class="sidebar">
       <div class="sidebar-header">
         <h2>🧠 DeepSeek Memory</h2>
-        <p style="font-size: 0.7rem; color: #888; margin-top: -6px; margin-bottom: 6px;">
-          Modified DeepSeek AI with long‑term memory
-        </p>
+        <p style="font-size:0.7rem;color:#888;margin-top:-4px;margin-bottom:8px;">Modified DeepSeek AI with long‑term memory</p>
         <button id="new-chat-btn" class="new-chat-btn">+ New Chat</button>
       </div>
-      <div class="chat-list" id="chat-list">
-        <!-- Chat history items will be injected here -->
-      </div>
+      <div class="chat-list" id="chat-list"></div>
       <div class="sidebar-footer">
         <button id="logout-btn" class="logout-btn">🚪 Logout</button>
       </div>
@@ -45,11 +37,27 @@
     <main class="main-chat">
       <div class="chat-header">
         <h3 id="chat-title">New Chat</h3>
-        <button id="delete-chat-btn" class="delete-btn" title="Delete this chat">🗑️</button>
+        <div class="header-actions">
+          <button id="settings-toggle-btn" class="settings-toggle" title="Personalize your AI">⚙️</button>
+          <button id="delete-chat-btn" class="delete-btn" title="Delete this chat">🗑️</button>
+        </div>
       </div>
-      <div class="messages-container" id="messages-container">
-        <!-- Messages will appear here -->
+
+      <!-- Settings Panel (hidden by default) -->
+      <div id="settings-panel" class="settings-panel hidden">
+        <div class="settings-content">
+          <h4>🧠 Personalize Your AI</h4>
+          <p>Set a custom system prompt to define your AI's personality, expertise, or behavior. Guardrails will still apply.</p>
+          <textarea id="custom-prompt-input" placeholder="Enter your custom system prompt here..."></textarea>
+          <div class="settings-actions">
+            <button id="save-prompt-btn" class="save-prompt-btn">💾 Save Prompt</button>
+            <button id="reset-prompt-btn" class="reset-prompt-btn">↩️ Reset to Default</button>
+          </div>
+          <div id="prompt-feedback" class="prompt-feedback"></div>
+        </div>
       </div>
+
+      <div class="messages-container" id="messages-container"></div>
       <div class="input-area">
         <input type="text" id="message-input" placeholder="Ask DeepSeek Memory anything..." />
         <button id="send-btn">Send</button>
