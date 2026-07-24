@@ -74,13 +74,21 @@ passport.deserializeUser(async (id, done) => {
 // ============================
 
 router.post('/verify-password', (req, res) => {
+  console.log('🔥🔥🔥 PAYWALL ROUTE HIT! 🔥🔥🔥');
+  console.log('📦 Request body:', req.body);
+  console.log('📦 Request headers:', {
+    'content-type': req.headers['content-type'],
+    'origin': req.headers['origin'],
+  });
+  
   const { password } = req.body;
   
-  // 🔍 DEBUG LOGS – will appear in Render logs
+  // Debug logs
   console.log('🔍 Received password:', password);
   console.log('🔑 Config passwords:', config.apiPasswords);
   console.log('🔑 Type of config.apiPasswords:', typeof config.apiPasswords);
   console.log('🔑 Is it an array?', Array.isArray(config.apiPasswords));
+  console.log('🔑 Length:', config.apiPasswords?.length || 0);
   
   if (!password) {
     console.log('❌ No password provided');
@@ -92,7 +100,7 @@ router.post('/verify-password', (req, res) => {
   console.log('✅ Is valid?', isValid);
   
   if (!isValid) {
-    console.log('❌ Invalid password attempt');
+    console.log('❌ Invalid password attempt:', password);
     return res.status(401).json({ error: 'Invalid password' });
   }
   
@@ -105,6 +113,7 @@ router.post('/verify-password', (req, res) => {
 // ============================
 
 router.post('/register', async (req, res) => {
+  console.log('📝 Register attempt:', req.body.email);
   const { email, password, displayName } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password required' });
@@ -120,6 +129,7 @@ router.post('/register', async (req, res) => {
   const userId = await createUser(email, hash, displayName || email);
   const user = await findUserById(userId);
   const token = generateToken(user);
+  console.log('✅ User registered:', email);
   res.json({
     token,
     user: {
@@ -135,19 +145,23 @@ router.post('/register', async (req, res) => {
 // ============================
 
 router.post('/login', async (req, res) => {
+  console.log('🔐 Login attempt:', req.body.email);
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password required' });
   }
   const user = await findUserByEmail(email);
   if (!user) {
+    console.log('❌ User not found:', email);
     return res.status(401).json({ error: 'Invalid credentials' });
   }
   if (!user.password_hash) {
+    console.log('❌ Account uses Google login:', email);
     return res.status(401).json({ error: 'Account uses Google login. Please sign in with Google.' });
   }
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) {
+    console.log('❌ Invalid password for:', email);
     return res.status(401).json({ error: 'Invalid credentials' });
   }
   const token = generateToken(user);
@@ -156,6 +170,7 @@ router.post('/login', async (req, res) => {
     email: user.email,
     displayName: user.display_name
   };
+  console.log('✅ User logged in:', email);
   res.json({ token, user: userData });
 });
 
@@ -175,11 +190,13 @@ router.get('/google/callback',
       displayName: req.user.display_name
     };
     const frontendUrl = process.env.FRONTEND_URL || 'https://AgentXCO2-Dev.github.io/DeepSeek-Personal';
+    console.log('✅ Google login success:', user.email);
     res.redirect(`${frontendUrl}?token=${token}&user=${encodeURIComponent(JSON.stringify(user))}`);
   }
 );
 
 router.get('/google/failure', (req, res) => {
+  console.log('❌ Google login failed');
   res.status(401).json({ error: 'Google authentication failed' });
 });
 
