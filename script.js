@@ -1,5 +1,5 @@
 // ===== CONFIG =====
-const API_BASE = 'https://deepseek-personal.onrender.com'; // Change to your backend URL
+const API_BASE = 'https://deepseek-personal.onrender.com';
 // ===== DOM REFS =====
 // Paywall
 const paywallScreen = document.getElementById('paywall-screen');
