@@ -162,14 +162,15 @@ function renderChatList() {
 }
 
 // ============================
-// RENDER MESSAGES (with code blocks – same as before)
+// RENDER MESSAGES (with code blocks)
 // ============================
+
 function renderMessages(messages) {
   messagesContainer.innerHTML = '';
   if (messages.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'message system';
-    empty.textContent = '✨ Start a new conversation with DeepSeek Memory!';
+    empty.textContent = '✨ Start a new conversation!';
     messagesContainer.appendChild(empty);
     return;
   }
@@ -272,6 +273,7 @@ function createCodeBlock(code, language) {
 // ============================
 // ADD MESSAGE
 // ============================
+
 function addMessage(role, content) {
   if (!currentChatId || !chats[currentChatId]) return;
   const chat = chats[currentChatId];
@@ -290,6 +292,7 @@ function addMessage(role, content) {
 // ============================
 // SEND MESSAGE (WITH HISTORY & CUSTOM PROMPT)
 // ============================
+
 async function sendMessage() {
   const message = messageInput.value.trim();
   if (!message) return;
@@ -310,7 +313,6 @@ async function sendMessage() {
   chat.messages.push({ role: 'assistant', content: '…' });
   renderMessages(chat.messages);
 
-  // Read the current custom prompt (from the textarea in case they changed it without saving, but we save on change)
   const systemPrompt = customSystemPrompt || null;
 
   try {
@@ -324,7 +326,7 @@ async function sendMessage() {
         user_id: USER_ID,
         message: message,
         history: history,
-        system_prompt: systemPrompt, // <-- SEND CUSTOM PROMPT
+        system_prompt: systemPrompt,
         thinking: true,
         reasoning_effort: 'high',
       }),
@@ -354,9 +356,9 @@ async function sendMessage() {
 // ============================
 // SETTINGS LOGIC
 // ============================
+
 settingsToggle.addEventListener('click', () => {
   settingsPanel.classList.toggle('hidden');
-  // Reload the current prompt into the textarea if it's opened
   if (!settingsPanel.classList.contains('hidden')) {
     customPromptInput.value = customSystemPrompt;
     promptFeedback.textContent = '';
@@ -365,13 +367,11 @@ settingsToggle.addEventListener('click', () => {
 
 function saveCustomPrompt() {
   const newPrompt = customPromptInput.value.trim();
-  // We'll send a test moderation request to backend? Actually we'll do client-side check + backend will reject if unsafe.
-  // For safety, we'll also moderate on backend. Here we just save.
   customSystemPrompt = newPrompt;
   localStorage.setItem('custom_system_prompt', newPrompt);
   promptFeedback.textContent = '✅ Prompt saved successfully!';
   promptFeedback.className = 'prompt-feedback success';
-  // Optionally close panel after save?
+  // Optionally close panel after save
   // settingsPanel.classList.add('hidden');
 }
 
@@ -386,7 +386,10 @@ function resetCustomPrompt() {
 savePromptBtn.addEventListener('click', saveCustomPrompt);
 resetPromptBtn.addEventListener('click', resetCustomPrompt);
 
-// ===== EVENT LISTENERS =====
+// ============================
+// EVENT LISTENERS
+// ============================
+
 sendBtn.addEventListener('click', sendMessage);
 messageInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
@@ -412,9 +415,38 @@ logoutBtn.addEventListener('click', () => {
   saveChatsToStorage();
 });
 
+// ============================
+// APPEND MESSAGE (helper for welcome)
+// ============================
+
+function appendMessage(role, content) {
+  // For welcome message only – adds to the current chat if it exists
+  if (!currentChatId || !chats[currentChatId]) return;
+  const chat = chats[currentChatId];
+  chat.messages.push({ role, content });
+  saveChatsToStorage();
+  renderMessages(chat.messages);
+  renderChatList();
+}
+
+// ===== WELCOME MESSAGE (Neutral, Generic) =====
 setTimeout(() => {
-  appendMessage('ai', "Hey twin! 💖 Welcome to **DeepSeek Memory** – a modified DeepSeek AI with long‑term memory. Enter your password above, then ask me anything! I remember everything we discuss.");
-}, 300);
+  // We'll add the welcome message to the current chat once it's loaded
+  // But we need to wait for the chat to be created first
+  const checkAndWelcome = () => {
+    if (currentChatId && chats[currentChatId] && chats[currentChatId].messages.length === 0) {
+      appendMessage('assistant', "Hello! 👋 I'm your AI assistant. I can help with coding, research, brainstorming, and more. Feel free to personalize me using the settings panel (⚙️) – you can give me a custom personality or expertise! What can I help you with today?");
+    } else {
+      // If the chat already has messages, don't add welcome (it's a loaded chat)
+      if (currentChatId && chats[currentChatId] && chats[currentChatId].messages.length > 0) {
+        return;
+      }
+      // Otherwise check again in a bit
+      setTimeout(checkAndWelcome, 200);
+    }
+  };
+  checkAndWelcome();
+}, 400);
 
 // ===== START =====
 init();
