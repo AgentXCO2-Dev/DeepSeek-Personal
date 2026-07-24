@@ -14,3 +14,11 @@ All versions are currently being supported.
 ## Reporting a Vulnerability
 
 Open a GitHub issue to report a vulnerability.
+
+## Security Updates
+
+This will be updated as we upgrade DeepSeek-Personal.
+
+## is DeepSeek Personal free or paid?
+
+Its paid. Only 1 dollar though!
