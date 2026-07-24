@@ -1,6 +1,6 @@
 // ===== CONFIG =====
 const API_BASE = 'https://deepseek-personal.onrender.com/api'; // CHANGE TO YOUR BACKEND URL
-const USER_ID = 'twin1'; // fixed user ID for this demo
+const USER_ID = 'twin1';
 
 // ===== DOM REFS =====
 const passwordScreen = document.getElementById('password-screen');
@@ -21,23 +21,20 @@ const logoutBtn = document.getElementById('logout-btn');
 // ===== STATE =====
 let storedPassword = localStorage.getItem('twin_password') || '';
 let currentChatId = null;
-let chats = {}; // { chatId: { title, messages: [{role, content}] } }
-let chatOrder = []; // ordered list of chat IDs
+let chats = {};
+let chatOrder = [];
 
 // ===== INIT =====
 function init() {
   loadChatsFromStorage();
   renderChatList();
 
-  // If password already stored, auto-login
   if (storedPassword) {
     passwordScreen.classList.add('hidden');
     app.classList.remove('hidden');
-    // Create a new chat if none exists
     if (chatOrder.length === 0) {
       createNewChat();
     } else {
-      // Load the first chat
       loadChat(chatOrder[0]);
     }
   } else {
@@ -59,9 +56,6 @@ function handlePassword() {
     return;
   }
 
-  // We'll test the password by making a quick API call (or we can just trust it)
-  // For simplicity, we'll store it and try to send a test message later.
-  // Actually we can just store it and let the first API call fail if wrong.
   storedPassword = pwd;
   localStorage.setItem('twin_password', pwd);
   passwordScreen.classList.add('hidden');
@@ -69,7 +63,6 @@ function handlePassword() {
   passwordError.textContent = '';
   passwordInput.value = '';
 
-  // Create initial chat if none
   if (chatOrder.length === 0) {
     createNewChat();
   } else {
@@ -117,7 +110,6 @@ function loadChat(id) {
   const chat = chats[id];
   chatTitle.textContent = chat.title || 'New Chat';
   renderMessages(chat.messages);
-  // highlight in sidebar
   document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
   const activeEl = document.querySelector(`.chat-item[data-id="${id}"]`);
   if (activeEl) activeEl.classList.add('active');
@@ -168,6 +160,10 @@ function renderChatList() {
   });
 }
 
+// ============================
+// RENDER MESSAGES WITH CODE BLOCKS
+// ============================
+
 function renderMessages(messages) {
   messagesContainer.innerHTML = '';
   if (messages.length === 0) {
@@ -177,23 +173,156 @@ function renderMessages(messages) {
     messagesContainer.appendChild(emptyMsg);
     return;
   }
+
   messages.forEach(msg => {
-    const div = document.createElement('div');
-    div.className = 'message ' + msg.role;
-    div.textContent = msg.content;
-    messagesContainer.appendChild(div);
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message-wrapper ' + msg.role;
+
+    if (msg.role === 'user') {
+      const div = document.createElement('div');
+      div.className = 'message user';
+      div.textContent = msg.content;
+      wrapper.appendChild(div);
+    } else if (msg.role === 'system') {
+      const div = document.createElement('div');
+      div.className = 'message system';
+      div.textContent = msg.content;
+      wrapper.appendChild(div);
+    } else {
+      // ASSISTANT – check for code blocks
+      const content = msg.content;
+      const parts = splitContentByCodeBlocks(content);
+      
+      const container = document.createElement('div');
+      container.className = 'assistant-message-container';
+      
+      parts.forEach(part => {
+        if (part.type === 'text') {
+          const textDiv = document.createElement('div');
+          textDiv.className = 'message assistant';
+          textDiv.textContent = part.content;
+          container.appendChild(textDiv);
+        } else if (part.type === 'code') {
+          const codeBlock = createCodeBlock(part.content, part.language);
+          container.appendChild(codeBlock);
+        }
+      });
+      
+      wrapper.appendChild(container);
+    }
+
+    messagesContainer.appendChild(wrapper);
   });
+
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
-// ===== ADD MESSAGE =====
+/**
+ * Split message content into text and code blocks.
+ * Returns array of { type: 'text'|'code', content: string, language?: string }
+ */
+function splitContentByCodeBlocks(content) {
+  const parts = [];
+  let remaining = content;
+  const regex = /```(\w*)\n([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(content)) !== null) {
+    // Text before the code block
+    if (match.index > lastIndex) {
+      const textBefore = content.slice(lastIndex, match.index);
+      if (textBefore.trim()) {
+        parts.push({ type: 'text', content: textBefore.trim() });
+      }
+    }
+    // The code block itself
+    const language = match[1] || 'plaintext';
+    const code = match[2];
+    parts.push({ type: 'code', content: code, language });
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Any remaining text after the last code block
+  if (lastIndex < content.length) {
+    const remainingText = content.slice(lastIndex);
+    if (remainingText.trim()) {
+      parts.push({ type: 'text', content: remainingText.trim() });
+    }
+  }
+
+  // If no code blocks were found, treat the whole thing as text
+  if (parts.length === 0) {
+    parts.push({ type: 'text', content });
+  }
+
+  return parts;
+}
+
+/**
+ * Create a beautiful, copyable code block element.
+ */
+function createCodeBlock(code, language) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'code-block-wrapper';
+
+  // Header with language and copy button
+  const header = document.createElement('div');
+  header.className = 'code-block-header';
+
+  const langSpan = document.createElement('span');
+  langSpan.className = 'code-language';
+  langSpan.textContent = language || 'plaintext';
+  header.appendChild(langSpan);
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'copy-btn';
+  copyBtn.textContent = '📋 Copy';
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      copyBtn.textContent = '✅ Copied!';
+      setTimeout(() => {
+        copyBtn.textContent = '📋 Copy';
+      }, 2000);
+    } catch {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea');
+      textarea.value = code;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      copyBtn.textContent = '✅ Copied!';
+      setTimeout(() => {
+        copyBtn.textContent = '📋 Copy';
+      }, 2000);
+    }
+  });
+  header.appendChild(copyBtn);
+
+  wrapper.appendChild(header);
+
+  // The code itself
+  const pre = document.createElement('pre');
+  pre.className = 'code-block';
+  const codeEl = document.createElement('code');
+  codeEl.textContent = code;
+  pre.appendChild(codeEl);
+  wrapper.appendChild(pre);
+
+  return wrapper;
+}
+
+// ============================
+// ADD MESSAGE
+// ============================
+
 function addMessage(role, content) {
   if (!currentChatId || !chats[currentChatId]) return;
   const chat = chats[currentChatId];
   chat.messages.push({ role, content });
-  // Update title if it's the first user message
   if (chat.messages.length === 1 && role === 'user') {
-    // Truncate for title
     let title = content.slice(0, 30);
     if (content.length > 30) title += '…';
     chat.title = title;
@@ -204,20 +333,22 @@ function addMessage(role, content) {
   renderChatList();
 }
 
-// ===== SEND MESSAGE TO BACKEND =====
+// ============================
+// SEND MESSAGE
+// ============================
+
 async function sendMessage() {
   const message = messageInput.value.trim();
   if (!message) return;
   if (!currentChatId) {
     createNewChat();
   }
-  // Add user message immediately
+
   addMessage('user', message);
   messageInput.value = '';
   sendBtn.disabled = true;
   messageInput.disabled = true;
 
-  // Add a placeholder assistant message (typing)
   const chat = chats[currentChatId];
   const placeholderIndex = chat.messages.length;
   chat.messages.push({ role: 'assistant', content: '…' });
@@ -244,9 +375,7 @@ async function sendMessage() {
       throw new Error(data.error || 'Request failed');
     }
 
-    // Replace placeholder with actual response
     chat.messages[placeholderIndex] = { role: 'assistant', content: data.response };
-    // If memory used, add a system note
     if (data.memory_used) {
       chat.messages.push({ role: 'system', content: '🧠 Memory used' });
     }
@@ -254,7 +383,6 @@ async function sendMessage() {
     renderMessages(chat.messages);
     renderChatList();
   } catch (error) {
-    // Replace placeholder with error
     chat.messages[placeholderIndex] = { role: 'assistant', content: `❌ Error: ${error.message}` };
     saveChatsToStorage();
     renderMessages(chat.messages);
@@ -274,9 +402,7 @@ messageInput.addEventListener('keydown', (e) => {
   }
 });
 
-newChatBtn.addEventListener('click', () => {
-  createNewChat();
-});
+newChatBtn.addEventListener('click', createNewChat);
 
 deleteChatBtn.addEventListener('click', () => {
   if (currentChatId) {
@@ -289,11 +415,9 @@ logoutBtn.addEventListener('click', () => {
   storedPassword = '';
   passwordScreen.classList.remove('hidden');
   app.classList.add('hidden');
-  // clear UI
   messagesContainer.innerHTML = '';
   chatTitle.textContent = 'New Chat';
   chatList.innerHTML = '';
-  // reset state
   chats = {};
   chatOrder = [];
   currentChatId = null;
