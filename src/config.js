@@ -2,11 +2,16 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const config = {
-  deepseekApiKey: process.env.DEEPSEEK_API_KEY,
+  // Groq API (FREE – get from console.groq.com)
+  groqApiKey: process.env.GROQ_API_KEY,
+  
+  // Password protection
   apiPassword: process.env.API_PASSWORD || 'DeepSeekAgentPersonal',
+  
+  // Memory settings (ChromaDB)
   chromaPersistDir: process.env.CHROMA_PERSIST_DIR || './chroma_db',
-  deepseekBaseUrl: 'https://api.deepseek.com',
-  deepseekModel: 'deepseek-v4-pro',
   maxMemoryResults: 5,
+  
+  // Server
   port: process.env.PORT || 8000,
 };
