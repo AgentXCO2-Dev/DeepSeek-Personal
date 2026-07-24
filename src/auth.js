@@ -48,7 +48,6 @@ passport.use(new GoogleStrategy({
       if (!user) {
         user = await findUserByEmail(email);
         if (user) {
-          // Link Google account to existing email user
           const db = await getDb();
           await db.run('UPDATE users SET google_id = ? WHERE id = ?', googleId, user.id);
           user = await findUserById(user.id);
@@ -79,7 +78,6 @@ router.post('/verify-password', (req, res) => {
   if (!password) {
     return res.status(400).json({ error: 'Password required' });
   }
-  // Check against API_PASSWORDS from config (array of allowed passwords)
   const isValid = config.apiPasswords.includes(password);
   if (!isValid) {
     return res.status(401).json({ error: 'Invalid password' });
