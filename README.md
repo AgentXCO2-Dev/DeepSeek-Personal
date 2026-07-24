@@ -2,7 +2,7 @@
 
 **Modified DeepSeek AI with long‑term memory.**
 
-A private, password‑protected AI assistant built on Groq, with persistent chat history, code block support, and built‑in guardrails.
+A private, password‑protected AI assistant built on DeepSeek & Mistral, with persistent chat history, code block support, and built‑in guardrails.
 
 ## ✨ Features
 - 🧠 Long‑term memory (in‑memory with context retrieval)
@@ -14,7 +14,7 @@ A private, password‑protected AI assistant built on Groq, with persistent chat
 
 ## 🛠️ Tech Stack
 - **Backend:** Node.js + Express
-- **LLM:** Groq (Llama 3.3 70B) with multi‑key rotation
+- **LLM:** DeepSeek (Main) Mistral (Speed)
 - **Frontend:** Vanilla HTML/CSS/JS
 - **Deployment:** Render (backend) + GitHub Pages (frontend)
 
