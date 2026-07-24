@@ -24,18 +24,8 @@ function getNextGroqKey() {
 // ============================
 
 export async function chatCompletion(messages, thinking = true, reasoningEffort = 'high') {
-  // First, try Groq with multi-key rotation and retry
-  try {
-    return await callGroqWithRetry(messages);
-  } catch (error) {
-    // If Groq fails (all keys exhausted or other error), try OpenRouter if available
-    if (config.openRouterApiKey) {
-      console.log('🔄 Groq failed, falling back to OpenRouter...');
-      return await callOpenRouter(messages);
-    }
-    // Otherwise re-throw the error
-    throw error;
-  }
+  // Try Groq with multi-key rotation and retry
+  return await callGroqWithRetry(messages);
 }
 
 // ============================
@@ -115,44 +105,4 @@ async function callGroq(messages, apiKey) {
     throw new Error('Empty response from Groq');
   }
   return content;
-}
-
-// ============================
-// OPENROUTER FALLBACK
-// ============================
-
-async function callOpenRouter(messages) {
-  if (!config.openRouterApiKey) {
-    throw new Error('OpenRouter API key not configured.');
-  }
-
-  // Convert messages to OpenRouter format (they use the same OpenAI structure)
-  const payload = {
-    model: 'google/gemma-2-9b-it:free',  // free model on OpenRouter
-    messages: messages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    })),
-    temperature: 0.7,
-    max_tokens: 8192,
-    top_p: 0.95,
-  };
-
-  try {
-    const response = await axios.post(
-      'https://openrouter.ai/api/v1/chat/completions',
-      payload,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.openRouterApiKey}`,
-        },
-        timeout: 60000,
-      }
-    );
-    return response.data.choices[0].message.content;
-  } catch (error) {
-    console.error('OpenRouter error:', error.response?.data || error.message);
-    throw new Error('OpenRouter fallback failed: ' + (error.response?.data?.error?.message || error.message));
-  }
 }
