@@ -18,16 +18,28 @@ const newChatBtn = document.getElementById('new-chat-btn');
 const deleteChatBtn = document.getElementById('delete-chat-btn');
 const logoutBtn = document.getElementById('logout-btn');
 
+// Settings elements
+const settingsToggle = document.getElementById('settings-toggle-btn');
+const settingsPanel = document.getElementById('settings-panel');
+const customPromptInput = document.getElementById('custom-prompt-input');
+const savePromptBtn = document.getElementById('save-prompt-btn');
+const resetPromptBtn = document.getElementById('reset-prompt-btn');
+const promptFeedback = document.getElementById('prompt-feedback');
+
 // ===== STATE =====
 let storedPassword = localStorage.getItem('twin_password') || '';
 let currentChatId = null;
 let chats = {};
 let chatOrder = [];
+let customSystemPrompt = localStorage.getItem('custom_system_prompt') || '';
 
 // ===== INIT =====
 function init() {
   loadChatsFromStorage();
   renderChatList();
+
+  // Load custom prompt into textarea
+  customPromptInput.value = customSystemPrompt;
 
   if (storedPassword) {
     passwordScreen.classList.add('hidden');
@@ -55,14 +67,12 @@ function handlePassword() {
     passwordError.textContent = 'Please enter a password.';
     return;
   }
-
   storedPassword = pwd;
   localStorage.setItem('twin_password', pwd);
   passwordScreen.classList.add('hidden');
   app.classList.remove('hidden');
   passwordError.textContent = '';
   passwordInput.value = '';
-
   if (chatOrder.length === 0) {
     createNewChat();
   } else {
@@ -94,10 +104,7 @@ function saveChatsToStorage() {
 
 function createNewChat() {
   const id = 'chat_' + Date.now();
-  chats[id] = {
-    title: 'New Chat',
-    messages: []
-  };
+  chats[id] = { title: 'New Chat', messages: [] };
   chatOrder.push(id);
   saveChatsToStorage();
   loadChat(id);
@@ -137,12 +144,10 @@ function renderChatList() {
     const div = document.createElement('div');
     div.className = 'chat-item' + (id === currentChatId ? ' active' : '');
     div.dataset.id = id;
-
     const titleSpan = document.createElement('span');
     titleSpan.className = 'chat-title';
     titleSpan.textContent = chat.title || 'New Chat';
     div.appendChild(titleSpan);
-
     const delBtn = document.createElement('button');
     delBtn.className = 'chat-delete';
     delBtn.textContent = '×';
@@ -151,33 +156,26 @@ function renderChatList() {
       deleteChat(id);
     });
     div.appendChild(delBtn);
-
-    div.addEventListener('click', () => {
-      loadChat(id);
-    });
-
+    div.addEventListener('click', () => loadChat(id));
     chatList.appendChild(div);
   });
 }
 
 // ============================
-// RENDER MESSAGES WITH CODE BLOCKS
+// RENDER MESSAGES (with code blocks – same as before)
 // ============================
-
 function renderMessages(messages) {
   messagesContainer.innerHTML = '';
   if (messages.length === 0) {
-    const emptyMsg = document.createElement('div');
-    emptyMsg.className = 'message system';
-    emptyMsg.textContent = '✨ Start a new conversation with DeepSeek Memory!';
-    messagesContainer.appendChild(emptyMsg);
+    const empty = document.createElement('div');
+    empty.className = 'message system';
+    empty.textContent = '✨ Start a new conversation with DeepSeek Memory!';
+    messagesContainer.appendChild(empty);
     return;
   }
-
   messages.forEach(msg => {
     const wrapper = document.createElement('div');
     wrapper.className = 'message-wrapper ' + msg.role;
-
     if (msg.role === 'user') {
       const div = document.createElement('div');
       div.className = 'message user';
@@ -189,13 +187,10 @@ function renderMessages(messages) {
       div.textContent = msg.content;
       wrapper.appendChild(div);
     } else {
-      // ASSISTANT – check for code blocks
-      const content = msg.content;
-      const parts = splitContentByCodeBlocks(content);
-      
+      // assistant
+      const parts = splitContentByCodeBlocks(msg.content);
       const container = document.createElement('div');
       container.className = 'assistant-message-container';
-      
       parts.forEach(part => {
         if (part.type === 'text') {
           const textDiv = document.createElement('div');
@@ -207,74 +202,43 @@ function renderMessages(messages) {
           container.appendChild(codeBlock);
         }
       });
-      
       wrapper.appendChild(container);
     }
-
     messagesContainer.appendChild(wrapper);
   });
-
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
-/**
- * Split message content into text and code blocks.
- * Returns array of { type: 'text'|'code', content: string, language?: string }
- */
 function splitContentByCodeBlocks(content) {
   const parts = [];
-  let remaining = content;
   const regex = /```(\w*)\n([\s\S]*?)```/g;
   let lastIndex = 0;
   let match;
-
   while ((match = regex.exec(content)) !== null) {
-    // Text before the code block
     if (match.index > lastIndex) {
-      const textBefore = content.slice(lastIndex, match.index);
-      if (textBefore.trim()) {
-        parts.push({ type: 'text', content: textBefore.trim() });
-      }
+      const text = content.slice(lastIndex, match.index).trim();
+      if (text) parts.push({ type: 'text', content: text });
     }
-    // The code block itself
     const language = match[1] || 'plaintext';
     const code = match[2];
     parts.push({ type: 'code', content: code, language });
     lastIndex = match.index + match[0].length;
   }
-
-  // Any remaining text after the last code block
-  if (lastIndex < content.length) {
-    const remainingText = content.slice(lastIndex);
-    if (remainingText.trim()) {
-      parts.push({ type: 'text', content: remainingText.trim() });
-    }
-  }
-
-  // If no code blocks were found, treat the whole thing as text
-  if (parts.length === 0) {
-    parts.push({ type: 'text', content });
-  }
-
+  const remaining = content.slice(lastIndex).trim();
+  if (remaining) parts.push({ type: 'text', content: remaining });
+  if (parts.length === 0) parts.push({ type: 'text', content });
   return parts;
 }
 
-/**
- * Create a beautiful, copyable code block element.
- */
 function createCodeBlock(code, language) {
   const wrapper = document.createElement('div');
   wrapper.className = 'code-block-wrapper';
-
-  // Header with language and copy button
   const header = document.createElement('div');
   header.className = 'code-block-header';
-
-  const langSpan = document.createElement('span');
-  langSpan.className = 'code-language';
-  langSpan.textContent = language || 'plaintext';
-  header.appendChild(langSpan);
-
+  const lang = document.createElement('span');
+  lang.className = 'code-language';
+  lang.textContent = language || 'plaintext';
+  header.appendChild(lang);
   const copyBtn = document.createElement('button');
   copyBtn.className = 'copy-btn';
   copyBtn.textContent = '📋 Copy';
@@ -282,42 +246,32 @@ function createCodeBlock(code, language) {
     try {
       await navigator.clipboard.writeText(code);
       copyBtn.textContent = '✅ Copied!';
-      setTimeout(() => {
-        copyBtn.textContent = '📋 Copy';
-      }, 2000);
+      setTimeout(() => { copyBtn.textContent = '📋 Copy'; }, 2000);
     } catch {
-      // Fallback for older browsers
-      const textarea = document.createElement('textarea');
-      textarea.value = code;
-      document.body.appendChild(textarea);
-      textarea.select();
+      const ta = document.createElement('textarea');
+      ta.value = code;
+      document.body.appendChild(ta);
+      ta.select();
       document.execCommand('copy');
-      document.body.removeChild(textarea);
+      document.body.removeChild(ta);
       copyBtn.textContent = '✅ Copied!';
-      setTimeout(() => {
-        copyBtn.textContent = '📋 Copy';
-      }, 2000);
+      setTimeout(() => { copyBtn.textContent = '📋 Copy'; }, 2000);
     }
   });
   header.appendChild(copyBtn);
-
   wrapper.appendChild(header);
-
-  // The code itself
   const pre = document.createElement('pre');
   pre.className = 'code-block';
   const codeEl = document.createElement('code');
   codeEl.textContent = code;
   pre.appendChild(codeEl);
   wrapper.appendChild(pre);
-
   return wrapper;
 }
 
 // ============================
 // ADD MESSAGE
 // ============================
-
 function addMessage(role, content) {
   if (!currentChatId || !chats[currentChatId]) return;
   const chat = chats[currentChatId];
@@ -334,33 +288,30 @@ function addMessage(role, content) {
 }
 
 // ============================
-// SEND MESSAGE (WITH HISTORY SUPPORT)
+// SEND MESSAGE (WITH HISTORY & CUSTOM PROMPT)
 // ============================
-
 async function sendMessage() {
   const message = messageInput.value.trim();
   if (!message) return;
-  if (!currentChatId) {
-    createNewChat();
-  }
+  if (!currentChatId) createNewChat();
 
-  // Add user message to UI immediately
   addMessage('user', message);
   messageInput.value = '';
   sendBtn.disabled = true;
   messageInput.disabled = true;
 
-  // Get the current chat's messages (excluding any system messages)
   const chat = chats[currentChatId];
   const history = chat.messages
-    .filter(msg => msg.role !== 'system') // don't send system messages
-    .slice(-20) // keep only the last 20 messages to avoid token limits
+    .filter(msg => msg.role !== 'system')
+    .slice(-20)
     .map(msg => ({ role: msg.role, content: msg.content }));
 
-  // Add a placeholder assistant message
   const placeholderIndex = chat.messages.length;
   chat.messages.push({ role: 'assistant', content: '…' });
   renderMessages(chat.messages);
+
+  // Read the current custom prompt (from the textarea in case they changed it without saving, but we save on change)
+  const systemPrompt = customSystemPrompt || null;
 
   try {
     const response = await fetch(`${API_BASE}/chat`, {
@@ -372,19 +323,16 @@ async function sendMessage() {
       body: JSON.stringify({
         user_id: USER_ID,
         message: message,
-        history: history,        // <-- NOW SENDING THE HISTORY!
+        history: history,
+        system_prompt: systemPrompt, // <-- SEND CUSTOM PROMPT
         thinking: true,
         reasoning_effort: 'high',
       }),
     });
 
     const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Request failed');
 
-    if (!response.ok) {
-      throw new Error(data.error || 'Request failed');
-    }
-
-    // Replace placeholder with actual response
     chat.messages[placeholderIndex] = { role: 'assistant', content: data.response };
     if (data.memory_used) {
       chat.messages.push({ role: 'system', content: '🧠 Memory used' });
@@ -403,6 +351,41 @@ async function sendMessage() {
   }
 }
 
+// ============================
+// SETTINGS LOGIC
+// ============================
+settingsToggle.addEventListener('click', () => {
+  settingsPanel.classList.toggle('hidden');
+  // Reload the current prompt into the textarea if it's opened
+  if (!settingsPanel.classList.contains('hidden')) {
+    customPromptInput.value = customSystemPrompt;
+    promptFeedback.textContent = '';
+  }
+});
+
+function saveCustomPrompt() {
+  const newPrompt = customPromptInput.value.trim();
+  // We'll send a test moderation request to backend? Actually we'll do client-side check + backend will reject if unsafe.
+  // For safety, we'll also moderate on backend. Here we just save.
+  customSystemPrompt = newPrompt;
+  localStorage.setItem('custom_system_prompt', newPrompt);
+  promptFeedback.textContent = '✅ Prompt saved successfully!';
+  promptFeedback.className = 'prompt-feedback success';
+  // Optionally close panel after save?
+  // settingsPanel.classList.add('hidden');
+}
+
+function resetCustomPrompt() {
+  customSystemPrompt = '';
+  localStorage.removeItem('custom_system_prompt');
+  customPromptInput.value = '';
+  promptFeedback.textContent = '↩️ Reset to default prompt.';
+  promptFeedback.className = 'prompt-feedback success';
+}
+
+savePromptBtn.addEventListener('click', saveCustomPrompt);
+resetPromptBtn.addEventListener('click', resetCustomPrompt);
+
 // ===== EVENT LISTENERS =====
 sendBtn.addEventListener('click', sendMessage);
 messageInput.addEventListener('keydown', (e) => {
@@ -411,15 +394,10 @@ messageInput.addEventListener('keydown', (e) => {
     sendMessage();
   }
 });
-
 newChatBtn.addEventListener('click', createNewChat);
-
 deleteChatBtn.addEventListener('click', () => {
-  if (currentChatId) {
-    deleteChat(currentChatId);
-  }
+  if (currentChatId) deleteChat(currentChatId);
 });
-
 logoutBtn.addEventListener('click', () => {
   localStorage.removeItem('twin_password');
   storedPassword = '';
@@ -434,7 +412,6 @@ logoutBtn.addEventListener('click', () => {
   saveChatsToStorage();
 });
 
-// ===== WELCOME MESSAGE =====
 setTimeout(() => {
   appendMessage('ai', "Hey twin! 💖 Welcome to **DeepSeek Memory** – a modified DeepSeek AI with long‑term memory. Enter your password above, then ask me anything! I remember everything we discuss.");
 }, 300);
