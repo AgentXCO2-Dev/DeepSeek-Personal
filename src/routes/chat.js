@@ -2,49 +2,72 @@ import express from 'express';
 import { authenticate } from '../auth.js';
 import { storeMemory, buildContext } from '../memory.js';
 import { chatCompletion } from '../deepseek-client.js';
-import { SYSTEM_PROMPT } from '../prompts.js';
+import { SYSTEM_PROMPT as DEFAULT_SYSTEM_PROMPT } from '../prompts.js';
+import { moderateText } from '../guardrails.js';
 
 const router = express.Router();
 
 router.post('/api/chat', authenticate, async (req, res) => {
-  const { user_id, message, history = [], thinking = true, reasoning_effort = 'high' } = req.body;
+  const { user_id, message, history = [], system_prompt = null, thinking = true, reasoning_effort = 'high' } = req.body;
 
   if (!user_id || !message) {
     return res.status(400).json({ error: 'user_id and message are required' });
   }
 
   try {
-    // 1. Retrieve long‑term memory context (from past sessions)
+    // --- MODERATE THE CUSTOM SYSTEM PROMPT (if provided) ---
+    let customPrompt = null;
+    if (system_prompt && system_prompt.trim()) {
+      const { flagged, score } = moderateText(system_prompt);
+      if (flagged) {
+        return res.status(400).json({
+          error: `⚠️ Your custom prompt was flagged as unsafe (score: ${score}). Please revise it.`
+        });
+      }
+      customPrompt = system_prompt.trim();
+    }
+
+    // 1. Retrieve long‑term memory context
     const context = await buildContext(user_id, message);
 
-    // 2. Build the messages array for the LLM
+    // 2. Build the messages array
     const messages = [];
 
-    // Add system prompt (with safety)
-    messages.push({ role: 'system', content: SYSTEM_PROMPT });
+    // --- System Prompt: merge safety + custom (if any) ---
+    // Import safety prompt from guardrails (we need to import it)
+    // We'll import getSafetySystemPrompt dynamically or include it here.
+    // For simplicity, we'll import it from guardrails.
+    const { getSafetySystemPrompt } = await import('../guardrails.js');
+    const safetyPrompt = getSafetySystemPrompt();
 
-    // If we have long‑term memory context, inject it as a user message
+    let finalSystemPrompt = safetyPrompt;
+    if (customPrompt) {
+      // Append custom prompt after safety instructions
+      finalSystemPrompt += `\n\n--- Additional Personality / Instructions from User ---\n${customPrompt}`;
+    }
+
+    messages.push({ role: 'system', content: finalSystemPrompt });
+
+    // Memory context
     if (context) {
       messages.push({
         role: 'user',
-        content: `(Here is some context from our past conversations that might be relevant:)\n${context}`
+        content: `(Context from past conversations:)\n${context}`
       });
     }
 
-    // Add the conversation history from the current session (sent from frontend)
-    // history already contains the user and assistant messages from this chat
+    // Chat history
     messages.push(...history);
 
-    // Add the new user message (the current one)
+    // New user message
     messages.push({ role: 'user', content: message });
 
-    // 3. Call the LLM (Mistral / Groq / etc.)
+    // 3. Call the LLM
     const responseText = await chatCompletion(messages, thinking, reasoning_effort);
 
-    // 4. Store this interaction in long‑term memory (for future sessions)
+    // 4. Store memory
     await storeMemory(user_id, message, responseText);
 
-    // 5. Send response back to frontend
     res.json({ response: responseText, memory_used: !!context });
   } catch (error) {
     console.error('Chat error:', error);
