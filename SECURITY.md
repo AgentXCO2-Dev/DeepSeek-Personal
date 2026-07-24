@@ -9,7 +9,7 @@ We actively support the currently released versions of DeepSeek-Personal. Securi
 | 5.1.x   | Not yet released |
 | 5.0.x   | Not yet released |
 | 4.0.x   | Not yet released |
-| 1.0.0   | ✅ Supported |
+| 1.0.x    | ✅ Supported |
 
 ## Reporting a Vulnerability
 
