@@ -28,46 +28,53 @@ function generateToken(user) {
 }
 
 // ============================
-// Passport Google Strategy
+// Google OAuth – ONLY if credentials are set
 // ============================
 
-passport.use(new GoogleStrategy({
-    clientID: config.googleClientId,
-    clientSecret: config.googleClientSecret,
-    callbackURL: config.googleCallbackUrl,
-  },
-  async (accessToken, refreshToken, profile, done) => {
-    try {
-      const googleId = profile.id;
-      const email = profile.emails?.[0]?.value;
-      const displayName = profile.displayName || email;
-      if (!email) {
-        return done(new Error('No email from Google'), null);
-      }
-      let user = await findUserByGoogleId(googleId);
-      if (!user) {
-        user = await findUserByEmail(email);
-        if (user) {
-          const db = await getDb();
-          await db.run('UPDATE users SET google_id = ? WHERE id = ?', googleId, user.id);
-          user = await findUserById(user.id);
-        } else {
-          const newId = await createUserWithGoogle(googleId, email, displayName);
-          user = await findUserById(newId);
-        }
-      }
-      return done(null, user);
-    } catch (err) {
-      return done(err, null);
-    }
-  }
-));
+if (config.googleClientId && config.googleClientSecret) {
+  console.log('🔐 Google OAuth enabled');
 
-passport.serializeUser((user, done) => done(null, user.id));
-passport.deserializeUser(async (id, done) => {
-  const user = await findUserById(id);
-  done(null, user);
-});
+  passport.use(new GoogleStrategy({
+      clientID: config.googleClientId,
+      clientSecret: config.googleClientSecret,
+      callbackURL: config.googleCallbackUrl,
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        const googleId = profile.id;
+        const email = profile.emails?.[0]?.value;
+        const displayName = profile.displayName || email;
+        if (!email) {
+          return done(new Error('No email from Google'), null);
+        }
+        let user = await findUserByGoogleId(googleId);
+        if (!user) {
+          user = await findUserByEmail(email);
+          if (user) {
+            const db = await getDb();
+            await db.run('UPDATE users SET google_id = ? WHERE id = ?', googleId, user.id);
+            user = await findUserById(user.id);
+          } else {
+            const newId = await createUserWithGoogle(googleId, email, displayName);
+            user = await findUserById(newId);
+          }
+        }
+        return done(null, user);
+      } catch (err) {
+        return done(err, null);
+      }
+    }
+  ));
+
+  passport.serializeUser((user, done) => done(null, user.id));
+  passport.deserializeUser(async (id, done) => {
+    const user = await findUserById(id);
+    done(null, user);
+  });
+
+} else {
+  console.log('⚠️ Google OAuth disabled – set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to enable');
+}
 
 // ============================
 // PAYWALL VERIFICATION (WITH DEBUGGING)
@@ -83,7 +90,6 @@ router.post('/verify-password', (req, res) => {
   
   const { password } = req.body;
   
-  // Debug logs
   console.log('🔍 Received password:', password);
   console.log('🔑 Config passwords:', config.apiPasswords);
   console.log('🔑 Type of config.apiPasswords:', typeof config.apiPasswords);
@@ -95,7 +101,6 @@ router.post('/verify-password', (req, res) => {
     return res.status(400).json({ error: 'Password required' });
   }
   
-  // Check if password is in the list
   const isValid = config.apiPasswords.includes(password);
   console.log('✅ Is valid?', isValid);
   
@@ -175,30 +180,32 @@ router.post('/login', async (req, res) => {
 });
 
 // ============================
-// GOOGLE OAUTH ROUTES
+// GOOGLE OAUTH ROUTES – ONLY IF ENABLED
 // ============================
 
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+if (config.googleClientId && config.googleClientSecret) {
+  router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
-router.get('/google/callback',
-  passport.authenticate('google', { session: false, failureRedirect: '/auth/google/failure' }),
-  (req, res) => {
-    const token = generateToken(req.user);
-    const user = {
-      id: req.user.id,
-      email: req.user.email,
-      displayName: req.user.display_name
-    };
-    const frontendUrl = process.env.FRONTEND_URL || 'https://AgentXCO2-Dev.github.io/DeepSeek-Personal';
-    console.log('✅ Google login success:', user.email);
-    res.redirect(`${frontendUrl}?token=${token}&user=${encodeURIComponent(JSON.stringify(user))}`);
-  }
-);
+  router.get('/google/callback',
+    passport.authenticate('google', { session: false, failureRedirect: '/auth/google/failure' }),
+    (req, res) => {
+      const token = generateToken(req.user);
+      const user = {
+        id: req.user.id,
+        email: req.user.email,
+        displayName: req.user.display_name
+      };
+      const frontendUrl = process.env.FRONTEND_URL || 'https://AgentXCO2-Dev.github.io/DeepSeek-Personal';
+      console.log('✅ Google login success:', user.email);
+      res.redirect(`${frontendUrl}?token=${token}&user=${encodeURIComponent(JSON.stringify(user))}`);
+    }
+  );
 
-router.get('/google/failure', (req, res) => {
-  console.log('❌ Google login failed');
-  res.status(401).json({ error: 'Google authentication failed' });
-});
+  router.get('/google/failure', (req, res) => {
+    console.log('❌ Google login failed');
+    res.status(401).json({ error: 'Google authentication failed' });
+  });
+}
 
 // ============================
 // GET CURRENT USER (PROTECTED)
