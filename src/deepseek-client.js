@@ -13,7 +13,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // ============================
 
 export async function chatCompletion(messages, thinking = true, reasoningEffort = 'high') {
-  // 1. Check the user's last message
+  // 1. Check the user's last message for safety violations
   const lastUserMsg = messages.filter(m => m.role === 'user').pop();
   if (lastUserMsg && lastUserMsg.content) {
     try {
@@ -26,7 +26,7 @@ export async function chatCompletion(messages, thinking = true, reasoningEffort 
     }
   }
 
-  // 2. Inject safety system prompt
+  // 2. Inject safety system prompt into the messages
   const safetyPrompt = getSafetySystemPrompt();
   let systemMsg = messages.find(m => m.role === 'system');
   if (systemMsg) {
@@ -35,9 +35,10 @@ export async function chatCompletion(messages, thinking = true, reasoningEffort 
     messages.unshift({ role: 'system', content: safetyPrompt });
   }
 
-  // 3. Call Cerebras
+  // 3. Call Cerebras with retry logic
   try {
-    const response = await callCerebras(messages);
+    const response = await callCerebrasWithRetry(messages);
+    // 4. Moderate the AI output
     const safeResponse = moderateAIOutput(response);
     return safeResponse;
   } catch (error) {
@@ -47,8 +48,30 @@ export async function chatCompletion(messages, thinking = true, reasoningEffort 
 }
 
 // ============================
-// CEREBRAS IMPLEMENTATION
+// CEREBRAS IMPLEMENTATION (WITH RETRY)
 // ============================
+
+async function callCerebrasWithRetry(messages, retries = 3) {
+  let lastError = null;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      return await callCerebras(messages);
+    } catch (error) {
+      const status = error.response?.status;
+      const retryAfter = parseInt(error.response?.headers?.['retry-after'] || '5000');
+      
+      if (status === 429) {
+        console.log(`⏳ Cerebras rate limited (attempt ${attempt + 1}/${retries}). Waiting ${retryAfter}ms...`);
+        await sleep(retryAfter);
+        continue;
+      }
+      
+      // Non‑rate‑limit errors – throw immediately
+      throw error;
+    }
+  }
+  throw new Error('❌ Cerebras rate limit exceeded. Please try again later.');
+}
 
 async function callCerebras(messages) {
   if (!config.cerebrasApiKey) {
@@ -65,7 +88,7 @@ async function callCerebras(messages) {
     return true;
   });
 
-  // Format messages for Cerebras (OpenAI-compatible)
+  // Format messages for Cerebras (OpenAI‑compatible format)
   const cerebrasMessages = [];
   if (systemPrompt) {
     cerebrasMessages.push({ role: 'system', content: systemPrompt });
@@ -74,8 +97,9 @@ async function callCerebras(messages) {
     cerebrasMessages.push({ role: msg.role, content: msg.content });
   });
 
+  // Cerebras API payload
   const payload = {
-    model: 'llama3.1-70b', // Cerebras model – fast and free!
+    model: 'llama-3.1-70b-instruct',  // ✅ Correct model name
     messages: cerebrasMessages,
     temperature: 0.7,
     max_tokens: 8192,
@@ -85,7 +109,7 @@ async function callCerebras(messages) {
 
   try {
     const response = await axios.post(
-      'https://api.cerebras.ai/v1/chat/completions',
+      'https://api.cerebras.ai/v1/chat/completions',  // ✅ Correct endpoint
       payload,
       {
         headers: {
@@ -103,25 +127,45 @@ async function callCerebras(messages) {
     return content;
   } catch (error) {
     const status = error.response?.status;
-    const errorMessage = error.response?.data?.error?.message || error.message;
+    const errorData = error.response?.data;
+    const errorMessage = errorData?.error?.message || error.message;
 
-    // Handle rate limits
-    if (status === 429) {
-      const retryAfter = parseInt(error.response?.headers?.['retry-after'] || '5000');
-      console.log(`⏳ Cerebras rate limited. Waiting ${retryAfter}ms...`);
-      await sleep(retryAfter);
-      // Retry once after waiting
-      return await callCerebras(messages);
+    // Detailed error logging
+    console.error('Cerebras API error details:', {
+      status,
+      error: errorData,
+      message: errorMessage,
+    });
+
+    // Handle specific HTTP status codes
+    if (status === 404) {
+      throw new Error(
+        '❌ Cerebras API endpoint not found (404). Please check:\n' +
+        '   - Your API key is valid at inference.cerebras.ai\n' +
+        '   - The endpoint URL is correct (https://api.cerebras.ai/v1/chat/completions)\n' +
+        '   - You have access to the llama-3.1-70b-instruct model'
+      );
     }
 
     if (status === 401 || status === 403) {
-      throw new Error('❌ Invalid Cerebras API key. Please check your CEREBRAS_API_KEY.');
+      throw new Error(
+        '❌ Invalid Cerebras API key (401/403). Please verify your key at inference.cerebras.ai'
+      );
+    }
+
+    if (status === 429) {
+      throw new Error(
+        `❌ Cerebras rate limit exceeded. Retry after ${error.response?.headers?.['retry-after'] || 'a few seconds'}.`
+      );
     }
 
     if (errorMessage.toLowerCase().includes('quota')) {
-      throw new Error('❌ Cerebras quota exhausted. Please check your usage at inference.cerebras.ai');
+      throw new Error(
+        '❌ Cerebras quota exhausted. Please check your usage at inference.cerebras.ai'
+      );
     }
 
+    // Generic fallback
     throw new Error(`Cerebras API error: ${errorMessage}`);
   }
 }
