@@ -169,7 +169,7 @@ function renderMessages(messages) {
   if (messages.length === 0) {
     const emptyMsg = document.createElement('div');
     emptyMsg.className = 'message system';
-    emptyMsg.textContent = '✨ Start a new conversation with your twin!';
+    emptyMsg.textContent = '✨ Start a new conversation with DeepSeek Memory!';
     messagesContainer.appendChild(emptyMsg);
     return;
   }
@@ -334,7 +334,7 @@ function addMessage(role, content) {
 }
 
 // ============================
-// SEND MESSAGE
+// SEND MESSAGE (WITH HISTORY SUPPORT)
 // ============================
 
 async function sendMessage() {
@@ -344,12 +344,20 @@ async function sendMessage() {
     createNewChat();
   }
 
+  // Add user message to UI immediately
   addMessage('user', message);
   messageInput.value = '';
   sendBtn.disabled = true;
   messageInput.disabled = true;
 
+  // Get the current chat's messages (excluding any system messages)
   const chat = chats[currentChatId];
+  const history = chat.messages
+    .filter(msg => msg.role !== 'system') // don't send system messages
+    .slice(-20) // keep only the last 20 messages to avoid token limits
+    .map(msg => ({ role: msg.role, content: msg.content }));
+
+  // Add a placeholder assistant message
   const placeholderIndex = chat.messages.length;
   chat.messages.push({ role: 'assistant', content: '…' });
   renderMessages(chat.messages);
@@ -364,6 +372,7 @@ async function sendMessage() {
       body: JSON.stringify({
         user_id: USER_ID,
         message: message,
+        history: history,        // <-- NOW SENDING THE HISTORY!
         thinking: true,
         reasoning_effort: 'high',
       }),
@@ -375,6 +384,7 @@ async function sendMessage() {
       throw new Error(data.error || 'Request failed');
     }
 
+    // Replace placeholder with actual response
     chat.messages[placeholderIndex] = { role: 'assistant', content: data.response };
     if (data.memory_used) {
       chat.messages.push({ role: 'system', content: '🧠 Memory used' });
@@ -423,6 +433,11 @@ logoutBtn.addEventListener('click', () => {
   currentChatId = null;
   saveChatsToStorage();
 });
+
+// ===== WELCOME MESSAGE =====
+setTimeout(() => {
+  appendMessage('ai', "Hey twin! 💖 Welcome to **DeepSeek Memory** – a modified DeepSeek AI with long‑term memory. Enter your password above, then ask me anything! I remember everything we discuss.");
+}, 300);
 
 // ===== START =====
 init();
