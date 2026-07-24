@@ -5,7 +5,7 @@ const userIdInput = document.getElementById('user-id');
 const passwordInput = document.getElementById('api-password');
 
 // CHANGE THIS when you deploy!
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = 'https://deepseek-personal.onrender.com/api';
 
 async function sendMessage() {
   const message = messageInput.value.trim();
