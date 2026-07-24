@@ -70,18 +70,33 @@ passport.deserializeUser(async (id, done) => {
 });
 
 // ============================
-// PAYWALL VERIFICATION
+// PAYWALL VERIFICATION (WITH DEBUGGING)
 // ============================
 
 router.post('/verify-password', (req, res) => {
   const { password } = req.body;
+  
+  // 🔍 DEBUG LOGS – will appear in Render logs
+  console.log('🔍 Received password:', password);
+  console.log('🔑 Config passwords:', config.apiPasswords);
+  console.log('🔑 Type of config.apiPasswords:', typeof config.apiPasswords);
+  console.log('🔑 Is it an array?', Array.isArray(config.apiPasswords));
+  
   if (!password) {
+    console.log('❌ No password provided');
     return res.status(400).json({ error: 'Password required' });
   }
+  
+  // Check if password is in the list
   const isValid = config.apiPasswords.includes(password);
+  console.log('✅ Is valid?', isValid);
+  
   if (!isValid) {
+    console.log('❌ Invalid password attempt');
     return res.status(401).json({ error: 'Invalid password' });
   }
+  
+  console.log('✅ Paywall passed successfully!');
   res.json({ success: true });
 });
 
