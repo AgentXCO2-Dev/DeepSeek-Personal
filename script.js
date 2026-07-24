@@ -1,14 +1,28 @@
 // ===== CONFIG =====
-const API_BASE = 'https://deepseek-personal.onrender.com/api'; // CHANGE TO YOUR BACKEND URL
-const USER_ID = 'twin1';
-
+const API_BASE = 'https://deepseek-personal.onrender.com'; // Change to your backend URL
 // ===== DOM REFS =====
-const passwordScreen = document.getElementById('password-screen');
-const app = document.getElementById('app');
-const passwordInput = document.getElementById('password-input');
-const passwordBtn = document.getElementById('password-btn');
-const passwordError = document.getElementById('password-error');
+// Paywall
+const paywallScreen = document.getElementById('paywall-screen');
+const paywallPasswordInput = document.getElementById('paywall-password-input');
+const paywallBtn = document.getElementById('paywall-btn');
+const paywallError = document.getElementById('paywall-error');
 
+// Auth
+const authScreen = document.getElementById('auth-screen');
+const loginForm = document.getElementById('login-form');
+const signupForm = document.getElementById('signup-form');
+const loginEmail = document.getElementById('login-email');
+const loginPassword = document.getElementById('login-password');
+const loginError = document.getElementById('login-error');
+const signupEmail = document.getElementById('signup-email');
+const signupName = document.getElementById('signup-name');
+const signupPassword = document.getElementById('signup-password');
+const signupError = document.getElementById('signup-error');
+const googleBtn = document.getElementById('google-btn');
+const tabBtns = document.querySelectorAll('.tab-btn');
+
+// Chat
+const app = document.getElementById('app');
 const chatList = document.getElementById('chat-list');
 const messagesContainer = document.getElementById('messages-container');
 const messageInput = document.getElementById('message-input');
@@ -17,8 +31,9 @@ const chatTitle = document.getElementById('chat-title');
 const newChatBtn = document.getElementById('new-chat-btn');
 const deleteChatBtn = document.getElementById('delete-chat-btn');
 const logoutBtn = document.getElementById('logout-btn');
+const userDisplay = document.getElementById('user-display');
 
-// Settings elements
+// Settings
 const settingsToggle = document.getElementById('settings-toggle-btn');
 const settingsPanel = document.getElementById('settings-panel');
 const customPromptInput = document.getElementById('custom-prompt-input');
@@ -27,62 +42,176 @@ const resetPromptBtn = document.getElementById('reset-prompt-btn');
 const promptFeedback = document.getElementById('prompt-feedback');
 
 // ===== STATE =====
-let storedPassword = localStorage.getItem('twin_password') || '';
 let currentChatId = null;
 let chats = {};
 let chatOrder = [];
-let customSystemPrompt = localStorage.getItem('custom_system_prompt') || '';
+let authToken = localStorage.getItem('auth_token') || null;
+let currentUser = null;
+let paywallPassed = localStorage.getItem('paywall_passed') === 'true';
 
-// ===== INIT =====
-function init() {
-  loadChatsFromStorage();
-  renderChatList();
+// ============================
+// PAYWALL
+// ============================
 
-  // Load custom prompt into textarea
-  customPromptInput.value = customSystemPrompt;
-
-  if (storedPassword) {
-    passwordScreen.classList.add('hidden');
-    app.classList.remove('hidden');
-    if (chatOrder.length === 0) {
-      createNewChat();
-    } else {
-      loadChat(chatOrder[0]);
-    }
-  } else {
-    passwordScreen.classList.remove('hidden');
-    app.classList.add('hidden');
-  }
+if (paywallPassed) {
+  paywallScreen.classList.add('hidden');
+  authScreen.classList.remove('hidden');
 }
 
-// ===== PASSWORD =====
-passwordBtn.addEventListener('click', handlePassword);
-passwordInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') handlePassword();
-});
-
-function handlePassword() {
-  const pwd = passwordInput.value.trim();
-  if (!pwd) {
-    passwordError.textContent = 'Please enter a password.';
+async function handlePaywall() {
+  const password = paywallPasswordInput.value.trim();
+  if (!password) {
+    paywallError.textContent = 'Please enter the access password.';
     return;
   }
-  storedPassword = pwd;
-  localStorage.setItem('twin_password', pwd);
-  passwordScreen.classList.add('hidden');
-  app.classList.remove('hidden');
-  passwordError.textContent = '';
-  passwordInput.value = '';
-  if (chatOrder.length === 0) {
-    createNewChat();
-  } else {
-    loadChat(chatOrder[0]);
+  try {
+    const response = await fetch(`${API_BASE}/auth/verify-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Invalid password');
+    // success
+    paywallScreen.classList.add('hidden');
+    authScreen.classList.remove('hidden');
+    paywallError.textContent = '';
+    paywallPasswordInput.value = '';
+    localStorage.setItem('paywall_passed', 'true');
+    paywallPassed = true;
+  } catch (err) {
+    paywallError.textContent = err.message || 'Invalid password. Please try again.';
   }
 }
 
-// ===== CHAT STORAGE =====
-function loadChatsFromStorage() {
-  const data = localStorage.getItem('twin_chats');
+paywallBtn.addEventListener('click', handlePaywall);
+paywallPasswordInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') handlePaywall();
+});
+
+// ============================
+// AUTH (Login / Signup / Google)
+// ============================
+
+tabBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    tabBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+    document.getElementById('signup-form').classList.toggle('hidden', tab !== 'signup');
+    loginError.textContent = '';
+    signupError.textContent = '';
+  });
+});
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const email = loginEmail.value.trim();
+  const password = loginPassword.value.trim();
+  if (!email || !password) {
+    loginError.textContent = 'Email and password required.';
+    return;
+  }
+  try {
+    const response = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Login failed');
+    authToken = data.token;
+    currentUser = data.user;
+    localStorage.setItem('auth_token', authToken);
+    loginError.textContent = '';
+    enterChat();
+  } catch (err) {
+    loginError.textContent = err.message;
+  }
+}
+
+async function handleSignup(e) {
+  e.preventDefault();
+  const email = signupEmail.value.trim();
+  const name = signupName.value.trim() || undefined;
+  const password = signupPassword.value.trim();
+  if (!email || !password) {
+    signupError.textContent = 'Email and password required.';
+    return;
+  }
+  if (password.length < 6) {
+    signupError.textContent = 'Password must be at least 6 characters.';
+    return;
+  }
+  try {
+    const response = await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, displayName: name }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Signup failed');
+    authToken = data.token;
+    currentUser = data.user;
+    localStorage.setItem('auth_token', authToken);
+    signupError.textContent = '';
+    enterChat();
+  } catch (err) {
+    signupError.textContent = err.message;
+  }
+}
+
+loginForm.addEventListener('submit', handleLogin);
+signupForm.addEventListener('submit', handleSignup);
+
+// Google OAuth – redirect to backend
+googleBtn.addEventListener('click', () => {
+  window.location.href = `${API_BASE}/auth/google`;
+});
+
+// Handle Google redirect (token in URL)
+const urlParams = new URLSearchParams(window.location.search);
+const tokenParam = urlParams.get('token');
+if (tokenParam) {
+  authToken = tokenParam;
+  localStorage.setItem('auth_token', authToken);
+  try {
+    const userParam = urlParams.get('user');
+    if (userParam) {
+      currentUser = JSON.parse(decodeURIComponent(userParam));
+    }
+    window.history.replaceState({}, document.title, window.location.pathname);
+    // If paywall not passed, hide paywall and show auth? Actually we need to show auth if not passed.
+    // But since we have token, we can skip auth and go straight to chat.
+    if (!paywallPassed) {
+      // user might have already passed paywall? Better to require paywall first.
+      // But we can still let them in if they have a valid token? We'll check token validity.
+      // For simplicity, we'll enter chat directly.
+    }
+    enterChat();
+  } catch (e) {
+    console.error('Error parsing user from URL:', e);
+  }
+}
+
+// ============================
+// ENTER CHAT (After Auth)
+// ============================
+
+async function enterChat() {
+  // Ensure paywall is hidden and auth is hidden
+  paywallScreen.classList.add('hidden');
+  authScreen.classList.add('hidden');
+  app.classList.remove('hidden');
+
+  if (currentUser && currentUser.displayName) {
+    userDisplay.textContent = `👤 ${currentUser.displayName}`;
+  }
+
+  // Load chats from localStorage (user-specific)
+  const storageKey = `chats_${currentUser?.id || 'anonymous'}`;
+  const data = localStorage.getItem(storageKey);
   if (data) {
     try {
       const parsed = JSON.parse(data);
@@ -96,11 +225,51 @@ function loadChatsFromStorage() {
     chats = {};
     chatOrder = [];
   }
+  renderChatList();
+  // Load custom prompt
+  await loadCustomPrompt();
+  if (chatOrder.length === 0) {
+    createNewChat();
+  } else {
+    loadChat(chatOrder[0]);
+  }
+}
+
+// ============================
+// CUSTOM PROMPT LOADING
+// ============================
+
+async function loadCustomPrompt() {
+  if (!authToken) return;
+  try {
+    const response = await fetch(`${API_BASE}/api/prompt`, {
+      headers: { 'Authorization': `Bearer ${authToken}` },
+    });
+    const data = await response.json();
+    if (data.prompt) {
+      customPromptInput.value = data.prompt;
+      localStorage.setItem(`custom_prompt_${currentUser?.id}`, data.prompt);
+    }
+  } catch (err) {
+    console.error('Failed to load custom prompt:', err);
+  }
+}
+
+// ============================
+// CHAT STORAGE (per user)
+// ============================
+
+function getStorageKey() {
+  return `chats_${currentUser?.id || 'anonymous'}`;
 }
 
 function saveChatsToStorage() {
-  localStorage.setItem('twin_chats', JSON.stringify({ chats, order: chatOrder }));
+  localStorage.setItem(getStorageKey(), JSON.stringify({ chats, order: chatOrder }));
 }
+
+// ============================
+// CHAT FUNCTIONS
+// ============================
 
 function createNewChat() {
   const id = 'chat_' + Date.now();
@@ -188,7 +357,7 @@ function renderMessages(messages) {
       div.textContent = msg.content;
       wrapper.appendChild(div);
     } else {
-      // assistant
+      // assistant – check for code blocks
       const parts = splitContentByCodeBlocks(msg.content);
       const container = document.createElement('div');
       container.className = 'assistant-message-container';
@@ -270,10 +439,6 @@ function createCodeBlock(code, language) {
   return wrapper;
 }
 
-// ============================
-// ADD MESSAGE
-// ============================
-
 function addMessage(role, content) {
   if (!currentChatId || !chats[currentChatId]) return;
   const chat = chats[currentChatId];
@@ -288,10 +453,6 @@ function addMessage(role, content) {
   renderMessages(chat.messages);
   renderChatList();
 }
-
-// ============================
-// SEND MESSAGE (WITH HISTORY & CUSTOM PROMPT)
-// ============================
 
 async function sendMessage() {
   const message = messageInput.value.trim();
@@ -313,20 +474,16 @@ async function sendMessage() {
   chat.messages.push({ role: 'assistant', content: '…' });
   renderMessages(chat.messages);
 
-  const systemPrompt = customSystemPrompt || null;
-
   try {
-    const response = await fetch(`${API_BASE}/chat`, {
+    const response = await fetch(`${API_BASE}/api/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-password': storedPassword,
+        'Authorization': `Bearer ${authToken}`,
       },
       body: JSON.stringify({
-        user_id: USER_ID,
         message: message,
         history: history,
-        system_prompt: systemPrompt,
         thinking: true,
         reasoning_effort: 'high',
       }),
@@ -354,32 +511,44 @@ async function sendMessage() {
 }
 
 // ============================
-// SETTINGS LOGIC
+// SETTINGS (Custom Prompt)
 // ============================
 
 settingsToggle.addEventListener('click', () => {
   settingsPanel.classList.toggle('hidden');
   if (!settingsPanel.classList.contains('hidden')) {
-    customPromptInput.value = customSystemPrompt;
+    customPromptInput.value = localStorage.getItem(`custom_prompt_${currentUser?.id}`) || '';
     promptFeedback.textContent = '';
   }
 });
 
-function saveCustomPrompt() {
-  const newPrompt = customPromptInput.value.trim();
-  customSystemPrompt = newPrompt;
-  localStorage.setItem('custom_system_prompt', newPrompt);
-  promptFeedback.textContent = '✅ Prompt saved successfully!';
-  promptFeedback.className = 'prompt-feedback success';
-  // Optionally close panel after save
-  // settingsPanel.classList.add('hidden');
+async function saveCustomPrompt() {
+  const prompt = customPromptInput.value.trim();
+  try {
+    const response = await fetch(`${API_BASE}/api/prompt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({ prompt }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to save prompt');
+    localStorage.setItem(`custom_prompt_${currentUser?.id}`, prompt);
+    promptFeedback.textContent = '✅ Prompt saved!';
+    promptFeedback.className = 'prompt-feedback success';
+  } catch (err) {
+    promptFeedback.textContent = `❌ Error: ${err.message}`;
+    promptFeedback.className = 'prompt-feedback error';
+  }
 }
 
 function resetCustomPrompt() {
-  customSystemPrompt = '';
-  localStorage.removeItem('custom_system_prompt');
   customPromptInput.value = '';
-  promptFeedback.textContent = '↩️ Reset to default prompt.';
+  localStorage.removeItem(`custom_prompt_${currentUser?.id}`);
+  saveCustomPrompt();
+  promptFeedback.textContent = '↩️ Reset to default.';
   promptFeedback.className = 'prompt-feedback success';
 }
 
@@ -387,7 +556,7 @@ savePromptBtn.addEventListener('click', saveCustomPrompt);
 resetPromptBtn.addEventListener('click', resetCustomPrompt);
 
 // ============================
-// EVENT LISTENERS
+// EVENT LISTENERS (Chat)
 // ============================
 
 sendBtn.addEventListener('click', sendMessage);
@@ -401,52 +570,49 @@ newChatBtn.addEventListener('click', createNewChat);
 deleteChatBtn.addEventListener('click', () => {
   if (currentChatId) deleteChat(currentChatId);
 });
+
 logoutBtn.addEventListener('click', () => {
-  localStorage.removeItem('twin_password');
-  storedPassword = '';
-  passwordScreen.classList.remove('hidden');
-  app.classList.add('hidden');
-  messagesContainer.innerHTML = '';
-  chatTitle.textContent = 'New Chat';
-  chatList.innerHTML = '';
+  localStorage.removeItem('auth_token');
+  authToken = null;
+  currentUser = null;
   chats = {};
   chatOrder = [];
   currentChatId = null;
-  saveChatsToStorage();
+  app.classList.add('hidden');
+  authScreen.classList.remove('hidden');
+  // Reset tab to login
+  document.getElementById('login-form').classList.remove('hidden');
+  document.getElementById('signup-form').classList.add('hidden');
+  tabBtns.forEach(b => b.classList.remove('active'));
+  document.querySelector('.tab-btn[data-tab="login"]').classList.add('active');
 });
 
-// ============================
-// APPEND MESSAGE (helper for welcome)
-// ============================
-
-function appendMessage(role, content) {
-  // For welcome message only – adds to the current chat if it exists
-  if (!currentChatId || !chats[currentChatId]) return;
-  const chat = chats[currentChatId];
-  chat.messages.push({ role, content });
-  saveChatsToStorage();
-  renderMessages(chat.messages);
-  renderChatList();
-}
-
-// ===== WELCOME MESSAGE (Neutral, Generic) =====
-setTimeout(() => {
-  // We'll add the welcome message to the current chat once it's loaded
-  // But we need to wait for the chat to be created first
-  const checkAndWelcome = () => {
-    if (currentChatId && chats[currentChatId] && chats[currentChatId].messages.length === 0) {
-      appendMessage('assistant', "Hello! 👋 I'm your AI assistant. I can help with coding, research, brainstorming, and more. Feel free to personalize me using the settings panel (⚙️) – you can give me a custom personality or expertise! What can I help you with today?");
-    } else {
-      // If the chat already has messages, don't add welcome (it's a loaded chat)
-      if (currentChatId && chats[currentChatId] && chats[currentChatId].messages.length > 0) {
-        return;
+// ===== AUTO-LOGIN CHECK =====
+if (authToken) {
+  fetch(`${API_BASE}/auth/me`, {
+    headers: { 'Authorization': `Bearer ${authToken}` },
+  })
+    .then(res => res.json())
+    .then(user => {
+      if (user && user.id) {
+        currentUser = user;
+        // If paywall not passed, we need to show paywall? Actually we can skip paywall if they have a valid token.
+        // But we want to enforce paywall first. However, if they have a token, they've already passed paywall at some point.
+        // We'll assume they have. If not, we'll show paywall.
+        if (!paywallPassed) {
+          // They have a token but paywall not marked? We'll set paywall as passed.
+          localStorage.setItem('paywall_passed', 'true');
+          paywallPassed = true;
+          paywallScreen.classList.add('hidden');
+        }
+        enterChat();
+      } else {
+        localStorage.removeItem('auth_token');
+        authToken = null;
       }
-      // Otherwise check again in a bit
-      setTimeout(checkAndWelcome, 200);
-    }
-  };
-  checkAndWelcome();
-}, 400);
-
-// ===== START =====
-init();
+    })
+    .catch(() => {
+      localStorage.removeItem('auth_token');
+      authToken = null;
+    });
+}
