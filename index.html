@@ -3,22 +3,57 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DeepSeek Memory – Personalized AI</title>
+  <title>DeepSeek Memory – Secure AI</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- ===== PASSWORD SCREEN ===== -->
-  <div id="password-screen" class="password-screen">
+  <!-- ===== PAYWALL SCREEN (Password) ===== -->
+  <div id="paywall-screen" class="password-screen">
     <div class="password-box">
       <h1>🧠 DeepSeek Memory</h1>
       <p><em>Modified DeepSeek AI with long‑term memory</em></p>
-      <input type="password" id="password-input" placeholder="Password..." />
-      <button id="password-btn">Unlock</button>
-      <div id="password-error" class="error-message"></div>
+      <p style="font-size:0.85rem;color:#888;margin-top:-6px;margin-bottom:16px;">
+        Enter your access password to continue.
+      </p>
+      <input type="password" id="paywall-password-input" placeholder="Access Password..." />
+      <button id="paywall-btn">Unlock</button>
+      <div id="paywall-error" class="error-message"></div>
     </div>
   </div>
 
-  <!-- ===== MAIN APP ===== -->
+  <!-- ===== AUTH SCREEN (Login / Signup) ===== -->
+  <div id="auth-screen" class="auth-screen hidden">
+    <div class="auth-box">
+      <h1>🧠 DeepSeek Memory</h1>
+      <p><em>Sign in to access your personal AI</em></p>
+      <div class="auth-tabs">
+        <button class="tab-btn active" data-tab="login">Sign In</button>
+        <button class="tab-btn" data-tab="signup">Sign Up</button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="login-form" class="auth-form">
+        <input type="email" id="login-email" placeholder="Email" required />
+        <input type="password" id="login-password" placeholder="Password" required />
+        <button type="submit" class="auth-btn">Sign In</button>
+        <div class="auth-error" id="login-error"></div>
+      </form>
+
+      <!-- Signup Form -->
+      <form id="signup-form" class="auth-form hidden">
+        <input type="email" id="signup-email" placeholder="Email" required />
+        <input type="text" id="signup-name" placeholder="Display Name (optional)" />
+        <input type="password" id="signup-password" placeholder="Password (min 6 chars)" required />
+        <button type="submit" class="auth-btn">Create Account</button>
+        <div class="auth-error" id="signup-error"></div>
+      </form>
+
+      <div class="auth-divider">or</div>
+      <button id="google-btn" class="google-btn">Continue with Google</button>
+    </div>
+  </div>
+
+  <!-- ===== MAIN CHAT UI ===== -->
   <div id="app" class="app hidden">
     <!-- Sidebar -->
     <aside class="sidebar">
@@ -29,11 +64,12 @@
       </div>
       <div class="chat-list" id="chat-list"></div>
       <div class="sidebar-footer">
+        <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px;">
+          <span id="user-display" style="color:#888;font-size:0.8rem;padding:0 8px;"></span>
+        </div>
         <button id="logout-btn" class="logout-btn">🚪 Logout</button>
       </div>
     </aside>
-
-    <!-- Main chat area -->
     <main class="main-chat">
       <div class="chat-header">
         <h3 id="chat-title">New Chat</h3>
@@ -42,12 +78,10 @@
           <button id="delete-chat-btn" class="delete-btn" title="Delete this chat">🗑️</button>
         </div>
       </div>
-
-      <!-- Settings Panel -->
       <div id="settings-panel" class="settings-panel hidden">
         <div class="settings-content">
           <h4>🧠 Personalize Your AI</h4>
-          <p>Set a custom system prompt to define your AI's personality, expertise, or behavior. Guardrails will still apply.</p>
+          <p>Set a custom system prompt to define your AI's personality, expertise, or behavior.</p>
           <textarea id="custom-prompt-input" placeholder="Enter your custom system prompt here..."></textarea>
           <div class="settings-actions">
             <button id="save-prompt-btn" class="save-prompt-btn">💾 Save Prompt</button>
@@ -56,7 +90,6 @@
           <div id="prompt-feedback" class="prompt-feedback"></div>
         </div>
       </div>
-
       <div class="messages-container" id="messages-container"></div>
       <div class="input-area">
         <input type="text" id="message-input" placeholder="Ask DeepSeek Memory anything..." />
