@@ -6,10 +6,10 @@ All versions are currently being supported.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :white_check_mark:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :white_check_mark:                |
+| 5.1.x   | Not released yet. |
+| 5.0.x   | Not released yet. |
+| 4.0.x   | Not released yet. |
+| 1.0.x  | :white_check_mark: |
 
 ## Reporting a Vulnerability
 
