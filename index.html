@@ -3,27 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Twin AI – DeepSeek Style</title>
+  <title>DeepSeek Memory – Modified DeepSeek AI with Long‑Term Memory</title>
+  <meta name="description" content="DeepSeek Memory – A modified DeepSeek AI with long‑term memory, built for twin." />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <!-- ===== PASSWORD SCREEN ===== -->
   <div id="password-screen" class="password-screen">
     <div class="password-box">
-      <h1>🔐 Twin AI</h1>
-      <p>Enter your password to access your personal AI</p>
+      <h1>🧠 DeepSeek Memory</h1>
+      <p><em>Modified DeepSeek AI with long‑term memory.</em></p>
+      <p style="font-size: 0.85rem; color: #888; margin-top: -10px; margin-bottom: 16px;">
+        Enter your password to access your personal AI.
+      </p>
       <input type="password" id="password-input" placeholder="Password..." />
       <button id="password-btn">Unlock</button>
       <div id="password-error" class="error-message"></div>
     </div>
   </div>
 
-  <!-- ===== MAIN APP (hidden until password is correct) ===== -->
+  <!-- ===== MAIN APP ===== -->
   <div id="app" class="app hidden">
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-header">
-        <h2>🧠 Twin AI</h2>
+        <h2>🧠 DeepSeek Memory</h2>
+        <p style="font-size: 0.7rem; color: #888; margin-top: -6px; margin-bottom: 6px;">
+          Modified DeepSeek AI with long‑term memory
+        </p>
         <button id="new-chat-btn" class="new-chat-btn">+ New Chat</button>
       </div>
       <div class="chat-list" id="chat-list">
@@ -44,13 +51,12 @@
         <!-- Messages will appear here -->
       </div>
       <div class="input-area">
-        <input type="text" id="message-input" placeholder="Ask your twin anything..." />
+        <input type="text" id="message-input" placeholder="Ask DeepSeek Memory anything..." />
         <button id="send-btn">Send</button>
       </div>
     </main>
   </div>
 
-  <!-- JavaScript -->
   <script src="script.js"></script>
 </body>
 </html>
